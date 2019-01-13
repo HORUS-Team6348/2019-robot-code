@@ -1,6 +1,5 @@
 import math
 import wpilib
-from pid import PIDController
 
 class DriveTrain:
     def __init__(self, left_motor: wpilib.PWMSpeedController, right_motor: wpilib.PWMSpeedController):
