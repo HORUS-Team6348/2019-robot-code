@@ -19,8 +19,6 @@ class Robot(wpilib.IterativeRobot):
         self.left_motor     = ctre.WPI_TalonSRX(1)
 
         self.drivetrain = DriveTrain(self.left_motor, self.right_motor)
-        self.climber    = Climber(self.climber_motor)
-        self.cube_arm   = CubeArm(self.arm_motor, self.arm_encoder)
 
         self.auto_timer = wpilib.Timer()
         self.gyro = wpilib.ADXRS450_Gyro()
@@ -29,16 +27,7 @@ class Robot(wpilib.IterativeRobot):
 
     def autonomousInit(self):
         """This function is run once each time the robot enters autonomous mode."""
-        self.auto_timer.start()
-        self.gyro.reset()
-        self.left_encoder.reset()
-        self.right_encoder.reset()
-        self.arm_encoder.reset()
-
-        game_specific_message = wpilib.DriverStation.getInstance().getGameSpecificMessage()
-        robot_position        = wpilib.SmartDashboard.getString("Robot position", "right")
-        delay                 = wpilib.SmartDashboard.getNumber("Autonomous delay", 0)
-        auto_override         = wpilib.SmartDashboard.getString("Autonomous override", "none")
+        pass
 
     def autonomousPeriodic(self):
         """This function is called periodically during autonomous mode."""
