@@ -3,15 +3,9 @@ import math
 import navx
 
 class DriveTrain:
-    def __init__(self, left_motor: wpilib.PWMSpeedController, right_motor: wpilib.PWMSpeedController, robot):
+    def __init__(self, left_motor: wpilib.PWMSpeedController, right_motor: wpilib.PWMSpeedController):
         self.left_motor = left_motor
         self.right_motor = right_motor
-
-        self.robot = robot
-
-        self.navx_angle    = 0
-        self.target_angle  = 0
-        self.rotating_auto = False
 
     @staticmethod
     def smooth_between(min, max, degrees):
@@ -65,19 +59,11 @@ class DriveTrain:
     def stop(self):
         self.set_motors(0,0)
 
-    def drive(self, stick: wpilib.Joystick, navx: navx.ahrs.AHRS):
-        if self.get_joystick_button(stick):
-            self.rotate_to_angle(stick, navx)
-            self.rotating_auto = True
-            self.robot.turnController.enable()
-        elif stick.getPOV() != -1:
-            self.drive_with_pad(stick, navx)
-            self.rotating_auto = False
-            self.robot.turnController.disable()
+    def drive(self, stick: wpilib.Joystick):
+        if stick.getPOV() != -1:
+            self.drive_with_pad(stick)
         else:
-            self.drive_with_joystick(stick, navx)
-            self.rotating_auto = False
-            self.robot.turnController.disable()
+            self.drive_with_joystick(stick)
 
     def set_motors(self, left_power, right_power):
         wpilib.SmartDashboard.putNumber("Left motor", left_power)
@@ -86,7 +72,7 @@ class DriveTrain:
         self.left_motor.set(left_power)
         self.right_motor.set(-1 * right_power)
 
-    def drive_with_joystick(self, stick: wpilib.Joystick, navx: navx.ahrs.AHRS):
+    def drive_with_joystick(self, stick: wpilib.Joystick):
         trigger = self.get_trigger(stick)
         x       = stick.getRawAxis(0)
         y       = stick.getRawAxis(1)
@@ -101,27 +87,12 @@ class DriveTrain:
         radians = math.atan2(y, x)
         heading = self.to_degrees(radians)
 
-        if wpilib.SmartDashboard.getBoolean("Field oriented drive", False):
-            correction = navx.getAngle() % 360
-            if correction > 180:
-                correction -= 360
-            
-            wpilib.SmartDashboard.putNumber("Corrected angle", correction)
-
-            heading_2 = heading - (correction)
-            heading_2 %= 360
-            
-            wpilib.SmartDashboard.putNumber("Heading FOD", heading_2)
-
-            self.drive_with_heading(heading_2, trigger)
-            return
-
         wpilib.SmartDashboard.putNumber("Heading", heading)
         wpilib.SmartDashboard.putNumber("Power", trigger)
 
         self.drive_with_heading(heading, trigger)
 
-    def drive_with_pad(self, stick: wpilib.Joystick, navx: navx.ahrs.AHRS):
+    def drive_with_pad(self, stick: wpilib.Joystick):
         trigger = self.get_trigger(stick)
         dpad    = stick.getPOV()
 
@@ -137,70 +108,6 @@ class DriveTrain:
         right_motor = self.get_right_motor(heading, trigger)
 
         self.set_motors(left_power, right_motor)
-    
-    def rotate_to_angle(self, stick: wpilib.Joystick, navx: navx.ahrs.AHRS):
-        button_pressed      = self.get_joystick_button(stick)
-        self.navx_angle     = navx.getAngle()
-
-        if button_pressed   == "Y":
-            self.target_angle = 0.0
-        elif button_pressed == "B":
-            self.target_angle = 90.0
-        elif button_pressed == "A":
-            self.target_angle = 180.0
-        elif button_pressed == "X":
-            self.target_angle = 270.0
-        
-        wpilib.SmartDashboard.putNumber("Target angle", self.target_angle)
-    
-    def normalize_angle(self, angle):
-        angle %= 360
-
-        if angle > 180:
-            angle -= 360
-    
-        return angle
-    
-    def get_angle_error(self):
-        navx_n   = self.normalize_angle(self.navx_angle)
-        target_n = self.normalize_angle(self.target_angle)
-
-        offset_a = target_n - navx_n
-
-        if offset_a > 0:
-            offset_b = 360 - offset_a
-        else:
-            offset_b = offset_a + 360
-
-        if abs(offset_a) > abs(offset_b):
-            best_offset = offset_b
-        else:
-            best_offset = offset_a
-        
-        wpilib.SmartDashboard.putNumber("TC error", best_offset)
-
-        return best_offset
-
-    def write_rotation(self, output):
-        if self.rotating_auto:
-            self.set_motors(-output, output)
-        
-    def get_joystick_button(self, stick: wpilib.Joystick):
-        stateA = stick.getRawButton(1)
-        stateB = stick.getRawButton(2)
-        stateX = stick.getRawButton(3)
-        stateY = stick.getRawButton(4)
-
-        if stateA:
-            return "A"
-        elif stateB:
-            return "B"
-        elif stateX:
-            return "X"
-        elif stateY:
-            return "Y"
-        else:
-            return False
 
     def get_trigger(self, stick: wpilib.Joystick):
         first_trigger  = stick.getRawAxis(3)
