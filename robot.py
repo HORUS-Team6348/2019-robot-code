@@ -37,6 +37,8 @@ class Robot(wpilib.TimedRobot):
         """This function is called periodically during operator control."""
         self.drivetrain.drive(self.driver_stick)
         wpilib.SmartDashboard.putNumber("NavX", self.navx.getAngle())
+        wpilib.SmartDashboard.putNumber("Right Encoder", self.right_drivetrain_motor.getQuadraturePosition())
+        wpilib.SmartDashboard.putNumber("Left Encoder", self.left_drivetrain_motor.getQuadraturePosition())
 
 
 if __name__ == "__main__":
