@@ -1,11 +1,35 @@
 import wpilib
 import math
 import navx
+import ctre
 
 class DriveTrain:
-    def __init__(self, left_motor: wpilib.PWMSpeedController, right_motor: wpilib.PWMSpeedController):
-        self.left_motor = left_motor
+    def __init__(self, left_motor: ctre.WPI_TalonSRX, right_motor: ctre.WPI_TalonSRX, navx: navx.ahrs.AHRS):
+        self.left_motor  = left_motor
         self.right_motor = right_motor
+        self.navx        = navx
+
+        self.left_motor.configSelectedFeedbackSensor(ctre.FeedbackDevice.CTRE_MagEncoder_Relative, 0, 0)
+        self.left_motor.setSensorPhase(True)
+        self.left_motor.config_kP(0, (1023 * 0.5)/4096, 0)
+        self.left_motor.config_kI(0, 0, 0)
+        self.left_motor.config_kD(0, 0, 0)
+        self.left_motor.config_kF(0, 0, 0)
+
+        self.right_motor.configSelectedFeedbackSensor(ctre.FeedbackDevice.CTRE_MagEncoder_Relative, 0, 0)
+        self.right_motor.setInverted(True)
+        self.right_motor.setSensorPhase(True)
+        self.right_motor.config_kP(0, (1023 * 0.5)/4096, 0)
+        self.right_motor.config_kI(0, 0, 0)
+        self.right_motor.config_kD(0, 0, 0)
+        self.right_motor.config_kF(0, 0, 0)
+
+        self.rotation_started     = False
+        self.distance_pid_started = False
+        self.target_angle     = 0
+        self.target_encoder_ticks = 0
+        self.i_acc            = 0
+        self.last_error       = 0
 
     @staticmethod
     def smooth_between(min, max, degrees):
@@ -58,19 +82,105 @@ class DriveTrain:
 
     def stop(self):
         self.set_motors(0,0)
+    
 
-    def drive(self, stick: wpilib.Joystick):
-        if stick.getPOV() != -1:
-            self.drive_with_pad(stick)
+    def drive(self, stick: wpilib.Joystick, ultrasonic_val):
+        if self.get_joystick_button(stick) in ("X", "B"):
+            if not self.rotation_started:
+                self.reset_angle_pid()
+                self.rotation_started = True
+                if self.get_joystick_button(stick) == "X":
+                    self.target_angle = self.navx.getAngle() - 90
+                else:
+                    self.target_angle = self.navx.getAngle() + 90
+            self.rotate_to_angle(stick)
+            self.reset_distance_pid()
+        
+        elif self.get_joystick_button(stick) in ("Y", "A"):
+            if not self.distance_pid_started:
+                self.distance_pid_started = True
+                self.right_motor_offset = self.right_motor.getQuadraturePosition()
+                self.left_motor_offset  = self.left_motor.getQuadraturePosition()
+            
+            if self.get_joystick_button(stick) == "Y":
+                right_target_encoder_ticks = self.right_motor_offset - ((63-21) * 85.551)
+                left_target_encoder_ticks  = self.left_motor_offset + ((63-21) * 85.551)
+            else:
+                right_target_encoder_ticks = self.right_motor_offset - ((130-21) * 85.551)
+                left_target_encoder_ticks  = self.left_motor_offset + ((130-21) * 85.551)
+            
+            if self.right_motor.getQuadraturePosition() < right_target_encoder_ticks:
+                self.right_motor.set(ctre.ControlMode.PercentOutput, 0)
+                self.left_motor.set(ctre.ControlMode.PercentOutput, 0)
+                return
+            else:
+                self.right_motor.set(ctre.ControlMode.Velocity, -2400)
+            
+            if self.left_motor.getQuadraturePosition() > left_target_encoder_ticks:
+                self.right_motor.set(ctre.ControlMode.PercentOutput, 0)
+                self.left_motor.set(ctre.ControlMode.PercentOutput, 0)
+                return
+            else:
+                self.left_motor.set(ctre.ControlMode.Velocity, -2400)
+        
+        elif stick.getPOV() != -1:
+            self.drive_with_pad(stick)  
+            self.reset_angle_pid()
+            self.reset_distance_pid()
+        
         else:
             self.drive_with_joystick(stick)
+            self.reset_angle_pid()
+            self.reset_distance_pid()
+    
+    def reset_angle_pid(self):
+        self.rotation_started = False
+        self.i_acc            = 0
+        self.last_error       = 0
+    
+    def reset_distance_pid(self):
+        self.distance_pid_started = False
+    
+    def rotate_to_angle(self, stick: wpilib.Joystick):
+        error = self.navx.getAngle() - self.target_angle
+        self.i_acc += error
+        
+        kP = 6/90
+        kI = 6/(90*40)
+        kD = 30/90
+
+        ctrl_effort = (kP * error) + (kI * self.i_acc) + (kD * (error - self.last_error))
+
+        self.set_motors(-ctrl_effort, ctrl_effort)
+
+        wpilib.SmartDashboard.putNumber("Angle error", error)
+        wpilib.SmartDashboard.putNumber("Control effort", ctrl_effort)
+        
+        self.last_error = error
+    
+    def get_joystick_button(self, stick: wpilib.Joystick):
+        stateA = stick.getRawButton(1)
+        stateB = stick.getRawButton(2)
+        stateX = stick.getRawButton(3)
+        stateY = stick.getRawButton(4)
+
+        if stateA:
+            return "A"
+        elif stateB:
+            return "B"
+        elif stateX:
+            return "X"
+        elif stateY:
+            return "Y"
+        else:
+            return False
 
     def set_motors(self, left_power, right_power):
         wpilib.SmartDashboard.putNumber("Left motor", left_power)
-        wpilib.SmartDashboard.putNumber("Right motor", (-1 * right_power))
+        wpilib.SmartDashboard.putNumber("Right motor", right_power)
 
-        self.left_motor.set(left_power)
-        self.right_motor.set(-1 * right_power)
+        self.left_motor.set(ctre.ControlMode.PercentOutput, left_power)
+        self.right_motor.set(ctre.ControlMode.PercentOutput, right_power)
 
     def drive_with_joystick(self, stick: wpilib.Joystick):
         trigger = self.get_trigger(stick)
