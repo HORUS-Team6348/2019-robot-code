@@ -23,43 +23,34 @@ class Shooter:
         self.right_shooter.config_kF(0, 1023/26000, 0)
     
     def shoot(self, stick: wpilib.Joystick):
-        if stick.getRawButton(3):
-            self.left_shooter.set(ctre.ControlMode.Velocity, 3000) #rocket bajo
-            self.right_shooter.set(ctre.ControlMode.Velocity, 3000)
+        if stick.getRawAxis(3) > 0.50:
+            self.left_shooter.set(ctre.ControlMode.Velocity, 6000) #rocket bajo
+            self.right_shooter.set(ctre.ControlMode.Velocity, 6000)
 
-            if self.left_shooter.getQuadratureVelocity() >= 2500 and self.right_shooter.getQuadratureVelocity() <= -2500:
-                self.intake_motor.set(1)
-
-        elif stick.getRawButton(4): #rocket medio, cargo
-            self.left_shooter.set(ctre.ControlMode.Velocity, 8000)
-            self.right_shooter.set(ctre.ControlMode.Velocity, 8000)
-
-            if self.left_shooter.getQuadratureVelocity() >= 7500 and self.right_shooter.getQuadratureVelocity() <= -7500:
-                self.intake_motor.set(1)
+            if self.left_shooter.getQuadratureVelocity() >= 5700 and self.right_shooter.getQuadratureVelocity() <= -5700:
+                self.intake_motor.set(-1)
         
-        elif stick.getRawButton(6): #rocket alto
-            self.left_shooter.set(ctre.ControlMode.Velocity, 17000)
-            self.right_shooter.set(ctre.ControlMode.Velocity, 17000)
+        elif stick.getPOV() == 0:
+            self.left_shooter.set(ctre.ControlMode.Velocity, 6500) #rocket bajo
+            self.right_shooter.set(ctre.ControlMode.Velocity, 6500)
 
-            if self.left_shooter.getQuadratureVelocity() >= 16500 and self.right_shooter.getQuadratureVelocity() <= -16500:
-                self.intake_motor.set(1)
+            if self.left_shooter.getQuadratureVelocity() >= 6200 and self.right_shooter.getQuadratureVelocity() <= -6200:
+                self.intake_motor.set(-1)
         
-        elif stick.getRawButton(1):
-            power = (-stick.getRawAxis(3)+1) * 13000
+        elif stick.getPOV() == 180:
+            self.left_shooter.set(ctre.ControlMode.Velocity, 5500) #rocket bajo
+            self.right_shooter.set(ctre.ControlMode.Velocity, 5500)
 
-            self.left_shooter.set(ctre.ControlMode.Velocity, power)
-            self.right_shooter.set(ctre.ControlMode.Velocity, power)
+            if self.left_shooter.getQuadratureVelocity() >= 5200 and self.right_shooter.getQuadratureVelocity() <= -5200:
+                self.intake_motor.set(-1)
 
-            if self.left_shooter.getQuadratureVelocity() >= (power - 500) and self.right_shooter.getQuadratureVelocity() <= -(power - 500):
-                self.intake_motor.set(1)
-
-        elif stick.getRawButton(2): #intake main
-            self.intake_motor.set(1)
+        elif stick.getRawAxis(2) > 0.50: #intake main
+            self.intake_motor.set(-1)
             self.left_shooter.set(ctre.ControlMode.PercentOutput, -0.3)
             self.right_shooter.set(ctre.ControlMode.PercentOutput, -0.3)
 
-        elif stick.getRawButton(5): #regresar pelota
-            self.intake_motor.set(-0.5)
+        elif stick.getRawButton(5) or stick.getRawButton(6): #regresar pelota
+            self.intake_motor.set(0.5)
             self.left_shooter.set(ctre.ControlMode.PercentOutput, -0.3)
             self.right_shooter.set(ctre.ControlMode.PercentOutput, -0.3)
 

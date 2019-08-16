@@ -1,13 +1,12 @@
 import wpilib
 import math
-import navx
 import ctre
 
 class DriveTrain:
-    def __init__(self, left_motor: ctre.WPI_TalonSRX, right_motor: ctre.WPI_TalonSRX, navx: navx.ahrs.AHRS):
+    def __init__(self, left_motor: ctre.WPI_TalonSRX, right_motor: ctre.WPI_TalonSRX):
         self.left_motor  = left_motor
         self.right_motor = right_motor
-        self.navx        = navx
+        #self.navx        = navx
 
         self.left_motor.configSelectedFeedbackSensor(ctre.FeedbackDevice.CTRE_MagEncoder_Relative, 0, 0)
         self.left_motor.setSensorPhase(True)
@@ -15,6 +14,10 @@ class DriveTrain:
         self.left_motor.config_kI(0, 0, 0)
         self.left_motor.config_kD(0, 0, 0)
         self.left_motor.config_kF(0, 0, 0)
+
+        self.left_motor.configVoltageCompSaturation(11.0, 0)
+        self.left_motor.enableVoltageCompensation(True)
+        self.left_motor.configVoltageMeasurementFilter(32, 0)
 
         self.right_motor.configSelectedFeedbackSensor(ctre.FeedbackDevice.CTRE_MagEncoder_Relative, 0, 0)
         self.right_motor.setInverted(True)
@@ -24,12 +27,19 @@ class DriveTrain:
         self.right_motor.config_kD(0, 0, 0)
         self.right_motor.config_kF(0, 0, 0)
 
+        self.right_motor.configVoltageCompSaturation(11.0, 0)
+        self.right_motor.enableVoltageCompensation(True)
+        self.right_motor.configVoltageMeasurementFilter(32, 0)
+
         self.rotation_started     = False
         self.distance_pid_started = False
         self.target_angle     = 0
         self.target_encoder_ticks = 0
         self.i_acc            = 0
         self.last_error       = 0
+
+        self.changeFrontButtonPressed = False
+        self.frontStatus = True
 
     @staticmethod
     def smooth_between(min, max, degrees):
@@ -83,8 +93,23 @@ class DriveTrain:
     def stop(self):
         self.set_motors(0,0)
     
+    def changeFront(self):
+        if self.frontStatus:
+            self.left_motor.setInverted(False)
+            self.right_motor.setInverted(True)
+        else:
+            self.left_motor.setInverted(True)
+            self.right_motor.setInverted(False)
 
-    def drive(self, stick: wpilib.Joystick, ultrasonic_val):
+     
+    def drive(self, stick: wpilib.Joystick):
+        if self.isRBPressed(stick) and not self.changeFrontButtonPressed:
+            self.frontStatus = not self.frontStatus
+            self.changeFront()
+            self.changeFrontButtonPressed = True
+        elif not self.isRBPressed(stick) and self.changeFrontButtonPressed:
+            self.changeFrontButtonPressed = False
+        """
         if self.get_joystick_button(stick) in ("X", "B"):
             if not self.rotation_started:
                 self.reset_angle_pid()
@@ -95,8 +120,9 @@ class DriveTrain:
                     self.target_angle = self.navx.getAngle() + 90
             self.rotate_to_angle(stick)
             self.reset_distance_pid()
+        """
         
-        elif self.get_joystick_button(stick) in ("Y", "A"):
+        if self.get_joystick_button(stick) in ("Y", "A"):
             if not self.distance_pid_started:
                 self.distance_pid_started = True
                 self.right_motor_offset = self.right_motor.getQuadraturePosition()
@@ -141,6 +167,7 @@ class DriveTrain:
     def reset_distance_pid(self):
         self.distance_pid_started = False
     
+    """
     def rotate_to_angle(self, stick: wpilib.Joystick):
         error = self.navx.getAngle() - self.target_angle
         self.i_acc += error
@@ -157,12 +184,16 @@ class DriveTrain:
         wpilib.SmartDashboard.putNumber("Control effort", ctrl_effort)
         
         self.last_error = error
+    """
+    
+    def isRBPressed(self, stick: wpilib.Joystick):
+        return stick.getRawButton(6)
     
     def get_joystick_button(self, stick: wpilib.Joystick):
-        stateA = stick.getRawButton(1)
-        stateB = stick.getRawButton(2)
-        stateX = stick.getRawButton(3)
-        stateY = stick.getRawButton(4)
+        stateA  = stick.getRawButton(1)
+        stateB  = stick.getRawButton(2)
+        stateX  = stick.getRawButton(3)
+        stateY  = stick.getRawButton(4)
 
         if stateA:
             return "A"
@@ -176,8 +207,8 @@ class DriveTrain:
             return False
 
     def set_motors(self, left_power, right_power):
-        wpilib.SmartDashboard.putNumber("Left motor", left_power)
-        wpilib.SmartDashboard.putNumber("Right motor", right_power)
+        #wpilib.SmartDashboard.putNumber("Left motor", left_power)
+        #wpilib.SmartDashboard.putNumber("Right motor", right_power)
 
         self.left_motor.set(ctre.ControlMode.PercentOutput, left_power)
         self.right_motor.set(ctre.ControlMode.PercentOutput, right_power)
@@ -197,8 +228,11 @@ class DriveTrain:
         radians = math.atan2(y, x)
         heading = self.to_degrees(radians)
 
-        wpilib.SmartDashboard.putNumber("Heading", heading)
-        wpilib.SmartDashboard.putNumber("Power", trigger)
+        if not self.frontStatus:
+            heading = 360 - heading
+
+        #wpilib.SmartDashboard.putNumber("Heading", heading)
+        #wpilib.SmartDashboard.putNumber("Power", trigger)
 
         self.drive_with_heading(heading, trigger)
 
